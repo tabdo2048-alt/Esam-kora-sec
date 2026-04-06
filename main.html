@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>Esam Kora - نتيجة الطلاب</title>
+
+<style>
+body {
+    font-family: Arial;
+    direction: rtl;
+    text-align: center;
+    background: linear-gradient(135deg,#141e30,#243b55);
+    color: white;
+}
+
+.container {
+    margin-top: 100px;
+}
+
+input {
+    padding: 12px;
+    width: 250px;
+    border-radius: 10px;
+    border: none;
+}
+
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    background: #00c6ff;
+    color: white;
+    cursor: pointer;
+    margin: 5px;
+}
+
+button:hover {
+    background: #0072ff;
+}
+
+.card {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>نتيجة مدرسة Esam Kora</h1>
+
+    <input type="text" id="seat" placeholder="ادخل رقم الجلوس">
+    <br>
+    <button onclick="getResult()">عرض النتيجة</button>
+    <br>
+    <button onclick="goTop()">عرض أوائل الطلاب</button>
+
+    <div id="result"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCMgXqovKaA6ylpM_3mq6zUAWyrhbA1m2M",
+  authDomain: "students-31340.firebaseapp.com",
+  projectId: "students-31340",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 🔥 قراءة CSV
+async function getCSVData() {
+    const res = await fetch("./results.csv");
+    const text = await res.text();
+
+    let rows = text.split("\n").map(r => r.trim()).filter(r => r);
+    let headers = rows[0].split(",");
+
+    let students = [];
+
+    for (let i = 1; i < rows.length; i++) {
+        let values = rows[i].split(",");
+        let student = { seat: values[0], name: values[1], grade: values[2], subjects: {} };
+        let total = 0;
+
+        for (let j = 3; j < headers.length; j++) {
+            let sub = headers[j];
+            let deg = parseInt(values[j]) || 0;
+            if (deg > 0) {
+                student.subjects[sub] = deg;
+                total += deg;
+            }
+        }
+
+        student.total = total;
+        student.status = total >= 140 ? "ناجح" : "راسب";
+        students.push(student);
+    }
+    return students;
+}
+
+// 🎯 عرض الطالب
+function displayStudent(student, rank) {
+    let html = `<div class="card">`;
+    html += `<h2>${student.name}</h2>`;
+    html += `<p>رقم الجلوس: ${student.seat}</p>`;
+    html += `<p>الصف: ${student.grade}</p>`;
+    html += `<p>الترتيب: ${rank}</p><hr>`;
+
+    let total = 0;
+
+    if (student.subjects) {
+        for (let sub in student.subjects) {
+            total += student.subjects[sub];
+            html += `<p>${sub}: ${student.subjects[sub]}</p>`;
+        }
+    }
+
+    html += `<hr>`;
+    html += `<h3>المجموع: ${total} / 280</h3>`;
+    html += `<h3>الحالة: ${student.status || (total >= 140 ? "ناجح" : "راسب")}</h3>`;
+    html += `</div>`;
+
+    document.getElementById("result").innerHTML = html;
+}
+
+// 🔍 البحث + حساب الترتيب
+window.getResult = async function() {
+    let seat = document.getElementById("seat").value.trim();
+    let resultDiv = document.getElementById("result");
+    resultDiv.innerHTML = "⏳ جاري البحث...";
+
+    try {
+        // CSV
+        let csvStudents = await getCSVData();
+
+        // Firebase
+        let fbStudents = [];
+        let querySnapshot = await getDocs(collection(db, "students"));
+        querySnapshot.forEach(doc => fbStudents.push(doc.data()));
+
+        // دمج الطلاب
+        let allStudents = [...csvStudents, ...fbStudents];
+
+        // حساب المجموع لأي طالب ما عليه مجموع
+        allStudents.forEach(stu => {
+            if (!stu.total) {
+                let t = 0;
+                for (let s in stu.subjects) {
+                    if (stu.subjects[s] > 0) t += stu.subjects[s];
+                }
+                stu.total = t;
+            }
+        });
+
+        // ترتيب تنازلي
+        allStudents.sort((a,b) => b.total - a.total);
+
+        // البحث + الترتيب
+        let student = null;
+        let rank = null;
+        for (let i = 0; i < allStudents.length; i++) {
+            if (allStudents[i].seat === seat) {
+                student = allStudents[i];
+                rank = i + 1;
+                break;
+            }
+        }
+
+        if (student) {
+            displayStudent(student, rank);
+        } else {
+            resultDiv.innerHTML = "❌ رقم الجلوس غير موجود";
+        }
+
+    } catch (error) {
+        resultDiv.innerHTML = "❌ خطأ: " + error;
+    }
+}
+
+// 🏆 زر الأوائل
+window.goTop = function() {
+    window.location.href = "top.html";
+}
+
+// by Ashraf.Tamer
+</script>
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>أوائل مدرسة Esam Kora</title>
+<style>
+body {
+    font-family: Arial;
+    direction: rtl;
+    text-align: center;
+    background: linear-gradient(135deg,#141e30,#243b55);
+    color: white;
+}
+.container {
+    margin: 50px auto;
+    width: 90%;
+    max-width: 800px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: rgba(255,255,255,0.1);
+}
+th, td {
+    padding: 12px;
+    border: 1px solid white;
+}
+th {
+    background: rgba(0,198,255,0.7);
+}
+select, button {
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: none;
+}
+button {
+    background: #00c6ff;
+    color: white;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>أوائل مدرسة Esam Kora</h1>
+
+    <!-- اختيار الصف -->
+    <select id="gradeSelect">
+        <option value="1">الصف الأول</option>
+        <option value="2">الصف الثاني</option>
+    </select>
+    <button onclick="loadTop()">عرض الأوائل</button>
+
+    <table id="topTable">
+        <thead>
+            <tr>
+                <th>الترتيب</th>
+                <th>اسم الطالب</th>
+                <th>رقم الجلوس</th>
+                <th>الصف</th>
+                <th>المجموع</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+// 📄 قراءة CSV
+async function loadCSV(fileName){
+    const response = await fetch(fileName);
+    const text = await response.text();
+
+    const lines = text.trim().split("\n");
+    const headers = lines.shift().split(",");
+
+    return lines.map(line=>{
+        let obj = {};
+        let data = line.split(",");
+        headers.forEach((h,i)=>{
+            obj[h] = data[i] ? data[i].trim() : "";
+        });
+
+        // حساب المجموع لو مش موجود
+        let total = 0;
+        for(let key in obj){
+            if(!["seat","name","grade","total","status"].includes(key) && obj[key] !== ""){
+                total += Number(obj[key]);
+            }
+        }
+
+        obj.total = obj.total ? Number(obj.total) : total;
+        obj.status = obj.total >= 210 ? "ناجح" : "راسب";
+
+        return obj;
+    });
+}
+
+// 🎯 عرض الأوائل
+async function loadTop(){
+    let grade = document.getElementById("gradeSelect").value;
+    let fileName = grade == "1" ? "top1.csv" : "top2.csv";
+
+    let students = await loadCSV(fileName);
+
+    // ترتيب حسب المجموع
+    students.sort((a,b)=> b.total - a.total);
+
+    let top10 = students.slice(0,10);
+
+    let tbody = document.querySelector("#topTable tbody");
+    tbody.innerHTML = "";
+
+    top10.forEach((stu,index)=>{
+        let row = `<tr>
+            <td>${index+1}</td>
+            <td>${stu.name}</td>
+            <td>${stu.seat}</td>
+            <td>${stu.grade}</td>
+            <td>${stu.total}</td>
+            <td>${stu.status}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+    });
+}
+</script>
+
+</body>
+</html>
